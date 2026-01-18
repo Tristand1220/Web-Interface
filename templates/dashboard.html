@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="initial-scale=1, width=device-width">
+    <title>EweGoUI - RPi Health Monitor</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+            --dark-bg: #1f2937;
+            --card-bg: #ffffff;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #949494, 0%, #383838 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .navbar-custom {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .dashboard-container {
+            padding: 2rem;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        
+        .card-custom {
+            background: var(--card-bg);
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            transition: transform 0.3s ease;
+        }
+        
+        .card-custom:hover {
+            transform: translateY(-5px);
+        }
+        
+        /* Device Header Dropdown Styles */
+        .device-header {
+            cursor: pointer;
+            user-select: none;
+            transition: background-color 0.2s ease;
+            padding: 1rem;
+            margin: -1.5rem -1.5rem 0 -1.5rem;
+            border-radius: 16px 16px 0 0;
+        }
+        
+        .device-header:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .device-header.collapsed {
+            border-radius: 16px;
+        }
+        
+        .chevron-icon {
+            transition: transform 0.3s ease;
+            font-size: 1.2rem;
+        }
+        
+        .chevron-icon.rotated {
+            transform: rotate(180deg);
+        }
+        
+        .device-details {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+        
+        .device-details.show {
+            max-height: 2000px;
+            transition: max-height 0.5s ease-in;
+        }
+        
+        .metric-card {
+            text-align: center;
+            padding: 1rem;
+        }
+        
+        .metric-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin: 0.5rem 0;
+        }
+        
+        .metric-label {
+            color: #6b7280;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+        
+        .status-online {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .status-offline {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .status-recording {
+            background: #fee2e2;
+            color: #991b1b;
+            animation: pulse 2s infinite;
+        }
+        
+        .status-healthy {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .status-warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .status-critical {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        .progress-custom {
+            height: 24px;
+            border-radius: 12px;
+            background: #e5e7eb;
+        }
+        
+        .progress-bar-custom {
+            border-radius: 12px;
+            transition: width 0.5s ease;
+        }
+        
+        .btn-record {
+            padding: 0.75rem 2rem;
+            border-radius: 30px;
+            font-weight: 600;
+            border: none;
+            transition: all 0.3s ease;
+            margin-right: 0.5rem;
+        }
+        
+        .btn-record.recording {
+            background: var(--danger-color);
+            color: white;
+        }
+        
+        .btn-record.not-recording {
+            background: #949494;
+;
+            color: white;
+        }
+        
+        .btn-sync {
+            padding: 0.75rem 1.5rem;
+            border-radius: 30px;
+            font-weight: 600;
+            border: none;
+            background: var(--primary-color);
+            color: white;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-record:hover, .btn-sync:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+        
+        .last-update {
+            color: #6b7280;
+            font-size: 0.85rem;
+            text-align: right;
+            margin-top: 0.5rem;
+        }
+        
+        .icon-large {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .battery-indicator {
+            position: relative;
+            display: inline-block;
+        }
+        
+        .battery-level-bar {
+            position: absolute;
+            bottom: 3px;
+            left: 2px;
+            height: 70%;
+            background: var(--success-color);
+            border-radius: 2px;
+            transition: width 0.3s ease;
+        }
+        
+        .gps-signal {
+            display: flex;
+            gap: 3px;
+            justify-content: center;
+            margin-top: 0.5rem;
+        }
+        
+        .signal-bar {
+            width: 4px;
+            background: #cbd5e1;
+            border-radius: 2px;
+            transition: background 0.3s ease;
+        }
+        
+        .signal-bar.active {
+            background: var(--success-color);
+        }
+        
+        .sync-spinner {
+            display: inline-block;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-custom">
+        <div class="container-fluid">
+            <span class="navbar-brand mb-0 h1">
+                <i class="bi bi-activity"></i> EweGoUI
+            </span>
+            <div>
+                <button id="recordBtn" class="btn btn-record not-recording">
+                    <i class="bi bi-circle-fill"></i> Start Recording
+                </button>
+                <button id="syncBtn" class="btn btn-sync">
+                    <i class="bi bi-cloud-upload"></i> Sync Now
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Dashboard -->
+    <div class="dashboard-container">
+        <!-- Device Status Header with Dropdown -->
+        <div class="card-custom">
+            <div class="device-header" id="deviceHeader">
+                <div class="row align-items-center">
+                    <div class="col-md-11">
+                        <h3 class="mb-1" id="deviceName">
+                            <i class="bi bi-laptop"></i> RPi CM4 - Sensor System
+                        </h3>
+                        <p class="mb-0">
+                            <span id="networkStatus" class="status-badge status-online">
+                                <i class="bi bi-wifi"></i> Online
+                            </span>
+                            <span id="recordingStatus" class="status-badge ms-2" style="display: none;">
+                                <i class="bi bi-record-circle"></i> Recording
+                            </span>
+                        </p>
+                    </div>
+                    <div class="col-md-1 text-end">
+                        <i class="bi bi-chevron-down chevron-icon" id="chevronIcon"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Collapsible Device Details -->
+            <div class="device-details" id="deviceDetails">
+                <div class="mt-4">
+                    <div class="text-end mb-3">
+                        <div class="last-update">
+                            Last updated: <span id="lastUpdate">--</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Critical Status Cards -->
+                    <div class="row">
+                        <!-- Battery Status -->
+                        <div class="col-md-3">
+                            <div class="card-custom metric-card">
+                                <div class="battery-indicator">
+                                    <i class="bi bi-battery-full icon-large" id="batteryIcon"></i>
+                                </div>
+                                <div class="metric-label">Battery Level</div>
+                                <div class="metric-value" id="batteryLevel">--</div>
+                                <small class="text-muted" id="batteryStatus">Unknown</small>
+                            </div>
+                        </div>
+                        
+                        <!-- Sync Status -->
+                        <div class="col-md-3">
+                            <div class="card-custom metric-card">
+                                <i class="bi bi-cloud-check icon-large" id="syncIcon"></i>
+                                <div class="metric-label">Sync Status</div>
+                                <div class="metric-value" style="font-size: 1.5rem;" id="syncStatus">--</div>
+                                <small class="text-muted">
+                                    <span id="pendingFiles">0</span> files pending
+                                </small>
+                                <div class="mt-2">
+                                    <small class="text-muted">Last: <span id="lastSync">Never</span></small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Recording Status -->
+                        <div class="col-md-3">
+                            <div class="card-custom metric-card">
+                                <i class="bi bi-camera-video icon-large text-primary" id="recordingIcon"></i>
+                                <div class="metric-label">Recording</div>
+                                <div class="metric-value" style="font-size: 1.5rem;" id="recordingStatusText">Stopped</div>
+                                <small class="text-muted">Uptime: <span id="uptime">--</span>h</small>
+                            </div>
+                        </div>
+
+                    <!-- System Metrics Row -->
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="card-custom metric-card">
+                                <i class="bi bi-speedometer2 icon-large text-success"></i>
+                                <div class="metric-label">Network Latency</div>
+                                <div class="metric-value" id="latency">--</div>
+                                <small class="text-muted">ms</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card-custom metric-card">
+                                <i class="bi bi-globe icon-large text-info"></i>
+                                <div class="metric-label">GPS Coordinates</div>
+                                <div style="font-size: 0.9rem; margin-top: 0.5rem;">
+                                    <div id="gpsLat">Lat: --</div>
+                                    <div id="gpsLon">Lon: --</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Memory & Storage Cards -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card-custom">
+                                <h5 class="mb-3">
+                                    <i class="bi bi-memory"></i> Memory Usage
+                                </h5>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span id="memoryUsed">-- GB</span>
+                                    <span id="memoryPercent">--%</span>
+                                </div>
+                                <div class="progress progress-custom">
+                                    <div id="memoryProgress" class="progress-bar progress-bar-custom bg-primary" 
+                                         role="progressbar" style="width: 0%"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card-custom">
+                                <h5 class="mb-3">
+                                    <i class="bi bi-hdd"></i> Disk Usage
+                                </h5>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span id="diskUsed">-- GB</span>
+                                    <span id="diskPercent">--%</span>
+                                </div>
+                                <div class="progress progress-custom">
+                                    <div id="diskProgress" class="progress-bar progress-bar-custom bg-warning" 
+                                         role="progressbar" style="width: 0%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        let isRecording = false;
+        let isSyncing = false;
+        let isExpanded = false;
+
+        // Toggle device details dropdown
+        document.getElementById('deviceHeader').addEventListener('click', function() {
+            const details = document.getElementById('deviceDetails');
+            const chevron = document.getElementById('chevronIcon');
+            const header = document.getElementById('deviceHeader');
+            
+            isExpanded = !isExpanded;
+            
+            if (isExpanded) {
+                details.classList.add('show');
+                chevron.classList.add('rotated');
+                header.classList.remove('collapsed');
+            } else {
+                details.classList.remove('show');
+                chevron.classList.remove('rotated');
+                header.classList.add('collapsed');
+            }
+        });
+
+        // Update health data from API
+        async function updateHealth() {
+            try {
+                const response = await fetch('/api/health');
+                const data = await response.json();
+                
+                // Update basic metrics
+                document.getElementById('latency').textContent = data.latency;
+                document.getElementById('uptime').textContent = data.uptime_hours;
+                
+                // Update network status
+                const networkBadge = document.getElementById('networkStatus');
+                if (data.network_status === 'online') {
+                    networkBadge.innerHTML = '<i class="bi bi-wifi"></i> Online';
+                    networkBadge.className = 'status-badge status-online';
+                } else {
+                    networkBadge.innerHTML = '<i class="bi bi-wifi-off"></i> Offline';
+                    networkBadge.className = 'status-badge status-offline';
+                }
+                
+                // Update memory
+                document.getElementById('memoryUsed').textContent = 
+                    `${data.memory_used} / ${data.memory_total} GB`;
+                document.getElementById('memoryPercent').textContent = 
+                    `${data.memory_percent}%`;
+                document.getElementById('memoryProgress').style.width = 
+                    `${data.memory_percent}%`;
+                
+                // Update disk
+                document.getElementById('diskUsed').textContent = 
+                    `${data.disk_used} / ${data.disk_total} GB`;
+                document.getElementById('diskPercent').textContent = 
+                    `${data.disk_percent}%`;
+                document.getElementById('diskProgress').style.width = 
+                    `${data.disk_percent}%`;
+                
+                // Update battery
+                updateBattery(data.battery);
+                
+                // Update GPS
+                updateGPS(data.gps);
+                
+                // Update sync
+                updateSync(data.sync);
+                
+                // Update recording status
+                isRecording = data.recording;
+                updateRecordingUI();
+                
+                // Update timestamp
+                document.getElementById('lastUpdate').textContent = data.timestamp;
+                
+                
+            } catch (error) {
+                console.error('Error fetching health data:', error);
+            }
+        }
+
+        function updateBattery(battery) {
+            const levelEl = document.getElementById('batteryLevel');
+            const statusEl = document.getElementById('batteryStatus');
+            const iconEl = document.getElementById('batteryIcon');
+            
+            if (battery.available) {
+                levelEl.textContent = `${battery.level}%`;
+                statusEl.textContent = battery.status.charAt(0).toUpperCase() + battery.status.slice(1);
+                
+                // Update battery icon based on level
+                let iconClass = 'bi-battery-full';
+                let color = 'var(--success-color)';
+                
+                if (battery.level <= 10) {
+                    iconClass = 'bi-battery';
+                    color = 'var(--danger-color)';
+                } else if (battery.level <= 25) {
+                    iconClass = 'bi-battery-half';
+                    color = 'var(--warning-color)';
+                } else if (battery.level <= 50) {
+                    iconClass = 'bi-battery-half';
+                }
+                
+                
+                iconEl.className = `bi ${iconClass} icon-large`;
+                iconEl.style.color = color;
+                levelEl.style.color = color;
+            } else {
+                levelEl.textContent = 'N/A';
+                statusEl.textContent = 'Not Available';
+                iconEl.className = 'bi bi-battery-full icon-large';
+                iconEl.style.color = '#9ca3af';
+            }
+        }
+
+        function updateGPS(gps) {
+            const latEl = document.getElementById('gpsLat');
+            const lonEl = document.getElementById('gpsLon');
+            
+            if (gps.connected) {
+                latEl.textContent = `Lat: ${gps.latitude.toFixed(4)}°`;
+                lonEl.textContent = `Lon: ${gps.longitude.toFixed(4)}°`;
+            } else {
+                latEl.textContent = 'Lat: --';
+                lonEl.textContent = 'Lon: --';
+            }
+        }
+
+        function updateSync(sync) {
+            const statusEl = document.getElementById('syncStatus');
+            const iconEl = document.getElementById('syncIcon');
+            const pendingEl = document.getElementById('pendingFiles');
+            const lastSyncEl = document.getElementById('lastSync');
+            
+            pendingEl.textContent = sync.pending_files;
+            lastSyncEl.textContent = sync.last_sync || 'Never';
+            
+            const statusMap = {
+                'synced': { text: 'Synced', icon: 'bi-cloud-check', color: 'var(--success-color)' },
+                'syncing': { text: 'Syncing...', icon: 'bi-cloud-arrow-up', color: 'var(--primary-color)' },
+                'pending': { text: 'Pending', icon: 'bi-cloud-slash', color: 'var(--warning-color)' },
+                'offline': { text: 'Offline', icon: 'bi-cloud-slash', color: 'var(--danger-color)' },
+                'error': { text: 'Error', icon: 'bi-exclamation-triangle', color: 'var(--danger-color)' }
+            };
+            
+            const config = statusMap[sync.status] || statusMap['offline'];
+            statusEl.textContent = config.text;
+            statusEl.style.color = config.color;
+            iconEl.className = `bi ${config.icon} icon-large`;
+            iconEl.style.color = config.color;
+            
+            if (sync.status === 'syncing') {
+                iconEl.classList.add('sync-spinner');
+            } else {
+                iconEl.classList.remove('sync-spinner');
+            }
+        }
+
+        // Toggle recording
+        async function toggleRecording() {
+            try {
+                const response = await fetch('/api/toggle_recording', {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                isRecording = data.recording;
+                updateRecordingUI();
+            } catch (error) {
+                console.error('Error toggling recording:', error);
+            }
+        }
+
+        // Update recording UI
+        function updateRecordingUI() {
+            const btn = document.getElementById('recordBtn');
+            const status = document.getElementById('recordingStatus');
+            const statusText = document.getElementById('recordingStatusText');
+            const icon = document.getElementById('recordingIcon');
+            
+            if (isRecording) {
+                btn.innerHTML = '<i class="bi bi-stop-circle-fill"></i> Stop Recording';
+                btn.className = 'btn btn-record recording';
+                status.style.display = 'inline-block';
+                status.className = 'status-badge status-recording ms-2';
+                statusText.textContent = 'Active';
+                statusText.style.color = 'var(--danger-color)';
+                icon.style.color = 'var(--danger-color)';
+            } else {
+                btn.innerHTML = '<i class="bi bi-circle-fill"></i> Start Recording';
+                btn.className = 'btn btn-record not-recording';
+                status.style.display = 'none';
+                statusText.textContent = 'Stopped';
+                statusText.style.color = '#6b7280';
+                icon.style.color = 'var(--primary-color)';
+            }
+        }
+
+        // Trigger sync
+        async function triggerSync() {
+            if (isSyncing) return;
+            
+            try {
+                isSyncing = true;
+                const syncBtn = document.getElementById('syncBtn');
+                syncBtn.disabled = true;
+                syncBtn.innerHTML = '<i class="bi bi-cloud-arrow-up sync-spinner"></i> Syncing...';
+                
+                const response = await fetch('/api/sync', {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                
+                setTimeout(() => {
+                    isSyncing = false;
+                    syncBtn.disabled = false;
+                    syncBtn.innerHTML = '<i class="bi bi-cloud-upload"></i> Sync Now';
+                }, 1000);
+                
+            } catch (error) {
+                console.error('Error triggering sync:', error);
+                isSyncing = false;
+                const syncBtn = document.getElementById('syncBtn');
+                syncBtn.disabled = false;
+                syncBtn.innerHTML = '<i class="bi bi-cloud-upload"></i> Sync Now';
+            }
+        }
+
+        // Event listeners
+        document.getElementById('recordBtn').addEventListener('click', toggleRecording);
+        document.getElementById('syncBtn').addEventListener('click', triggerSync);
+
+        // Initial update and set interval
+        updateHealth();
+        setInterval(updateHealth, 2000); // Update every 2 seconds
+    </script>
+</body>
+</html>

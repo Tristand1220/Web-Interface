@@ -1,0 +1,8 @@
+adafruit-io
+adafruit-circuitpython-rfm9x
+minimalmodbus
+gpiozero
+python-dotenv
+flask
+psutil
+gps3
