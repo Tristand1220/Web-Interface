@@ -7,14 +7,14 @@ import psutil
 import subprocess
 import threading
 import board
-import adafruit_max17048
+import adafruit_max1704x
 
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash
 from threading import Lock
 from datetime import datetime
-from serial import Serial
+#from serial import Serial
 from pyubx2 import UBXReader
-from zeroconf import  ServiceInfo, Zerconfig  #mDNS
+from zeroconf import  ServiceInfo, Zeroconf  #mDNS
 
 app = Flask(__name__)
 
@@ -119,7 +119,7 @@ def get_battery_level():
 # GPS MONITORING - ZED-X20P
 # ============================================================================
 
-def init_gps(port='/dev/serial0', baudrate=38400):
+def init_gps(port='/dev/ttyACM0', baudrate=38400):
 #Initialize GPS serial connection
 
     global gps_serial,gps_reader, gps_thread, gps_running
