@@ -11,11 +11,9 @@ import board
 import adafruit_max1704x
 
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash
-from threading import Lock
 from datetime import datetime
-#from serial import Serial
+from serial import Serial
 from pyubx2 import UBXReader
-from zeroconf import  ServiceInfo, Zeroconf  #mDNS
 from mdns_setup import EweGoMDNS
 
 app = Flask(__name__)
@@ -65,7 +63,7 @@ def init_battery():
     
     try:
         i2c = board.I2C()
-        max17_sensor = adafruit_max17048.MAX17048(i2c)
+        max17_sensor = adafruit_max1704x.MAX17048(i2c)
         
         print("Battery monitoring initialized successfully")
         battery_initialized = True
@@ -142,7 +140,7 @@ def init_gps(port='/dev/ttyACM0', baudrate=38400):
         
         #Start GPS reading thread
         gps_running=True
-        gps_thread = threading.Thread(target=gps_read_thread, daemon=True)
+        gps_thread = threading.Thread(target=gps_read_threading, daemon=True)
         gps_thread.start()
         
         print("GPS initialized successfully")
@@ -263,7 +261,11 @@ def get_gps_status():
             'altitude': round(gps_data['altitude'], 2),
             'available': gps_data['available']  
         }
-        
+
+# ============================================================================
+# SYNC STATUS
+# ============================================================================
+
 def check_sync_status():
     #Check sync status from remote server
     global sync_state
@@ -305,7 +307,9 @@ def check_sync_status():
         
     return sync_state
             
-      
+# ============================================================================
+# SYSTEM METRICS
+# ============================================================================
 def get_system_metrics():
     # Comphrensive system status
     
@@ -351,6 +355,9 @@ def get_system_metrics():
         'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     }
     
+# ============================================================================
+# FLASK ROUTES 
+# ============================================================================
 
 @app.route('/')
 def dashboard():  
@@ -384,39 +391,45 @@ def toggle_recording():
 def trigger_sync():"""
 
 if __name__ == '__main__':
-    # Use 0.0.0.0 to make it accessible on the network
-    app.run(host='0.0.0.0', port=5000, debug=True)
-
     print("=" * 60)
-    print("EweGoUI Health Monitor Starting...")
+    print("EweGo Pi App Starting...")
     print("=" * 60)
-    print(f"\nHosting device ID: {DEVICE_ID}")
-    print(f"Hosting Device Name: {DEVICE_NAME}")
+    print(f"\nDevice ID: {DEVICE_ID}")
+    print(f"Device Name: {DEVICE_NAME}")
     
     # Initialize mDNS service
-    print("\nStarting mDNS service...")
+    print("\Starting mDNS service...")
     mdns_service = EweGoMDNS(device_id=DEVICE_ID, port=5000)
     if mdns_service.start():
         print(f"Device discoverable at: http://{DEVICE_ID}.local:5000")
     else:
         print("mDNS failed - device only accessible by IP address")
     
-    print("\n🌐 Starting Flask web server...")
-    print(f"   Local access: http://localhost:5000")
-    print(f"   Network access: http://{DEVICE_ID}.local:5000")
-    print(f"   IP access: http://{mdns_service._get_local_ip()}:5000")
+    # Initialize GPS
+    print("\Initializing GPS...")
+    if init_gps():
+        print("GPS initialized (waiting for fix...)")
+    else:
+        print("GPS initialization failed")
+    
+    # Create recordings directory
+    os.makedirs('/home/pi/recordings', exist_ok=True)
+    print("\nRecordings directory ready")
+    
+    print("\nStarting Flask web server...")
+    print(f"   Local: http://localhost:5000")
+    print(f"   Network: http://{DEVICE_ID}.local:5000")
     print("\n   Press Ctrl+C to stop")
     print("=" * 60)
     print()
     
     try:
         # Run Flask app
-        app.run(host='0.0.0.0', port=5000, debug=True)
+        app.run(host='0.0.0.0', port=5000, debug=False)
     except KeyboardInterrupt:
         print("\n\nShutting down...")
     finally:
         # Clean shutdown
-        print("Stopping mDNS service...")
         if mdns_service:
             mdns_service.stop()
         print("✅ Shutdown complete")
