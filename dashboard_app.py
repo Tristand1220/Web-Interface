@@ -41,6 +41,7 @@ def scan_for_devices():
             
         # Scan every 30 seconds
         time.sleep(30)
+        
 def poll_device_health():
     # Polls all devices for health data
     

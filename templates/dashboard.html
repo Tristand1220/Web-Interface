@@ -436,7 +436,11 @@
             try {
                 const response = await fetch('/api/health');
                 const data = await response.json();
-                
+
+                //Update actual name of device
+                document.getElementById('deviceName').innerHTML = 
+                    `<i class="bi bi-laptop"></i> ${data.device_name || data.device_id || 'Unknown device'}`;
+
                 // Update basic metrics
                 document.getElementById('latency').textContent = data.latency;
                 document.getElementById('uptime').textContent = data.uptime_hours;
