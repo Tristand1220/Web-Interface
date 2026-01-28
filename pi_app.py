@@ -341,7 +341,7 @@ def get_system_metrics():
     """sync = check_sync_status()"""
     
     return {
-        'device_name': 'RPi CM4 - Sensor System',
+        'device_name': DEVICE_ID,
         'memory_used': round(memory_used_gb, 2),
         'memory_total': round(memory_total_gb, 2),
         'memory_percent': round(memory_percent, 1),
