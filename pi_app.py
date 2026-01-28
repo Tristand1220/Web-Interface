@@ -12,7 +12,7 @@ import adafruit_max1704x
 
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash
 from datetime import datetime
-from serial import Serial
+import serial
 from pyubx2 import UBXReader
 from mdns_setup import EweGoMDNS
 
@@ -133,7 +133,7 @@ def init_gps(port='/dev/ttyACM0', baudrate=38400):
     global gps_serial,gps_reader, gps_thread, gps_running
     try:
         # Opening the serial connection to GPS
-        gps_serial = Serial(port, baudrate, timeout=1)
+        gps_serial = serial.Serial(port, baudrate, timeout=1)
         
         # UBX Reader, handles UBX and NMEA messages
         gps_reader =UBXReader(gps_serial, protfilter=7)
@@ -266,7 +266,7 @@ def get_gps_status():
 # SYNC STATUS
 # ============================================================================
 
-def check_sync_status():
+"""def check_sync_status():
     #Check sync status from remote server
     global sync_state
     
@@ -305,7 +305,7 @@ def check_sync_status():
         print(f"Sync check error: {e}")
         sync_state['status'] = 'error'
         
-    return sync_state
+    return sync_state"""
             
 # ============================================================================
 # SYSTEM METRICS
@@ -338,7 +338,7 @@ def get_system_metrics():
     # Other monitored data
     battery = get_battery_level()
     gps = get_gps_status()
-    sync = check_sync_status()
+    """sync = check_sync_status()"""
     
     return {
         'device_name': 'RPi CM4 - Sensor System',
@@ -351,7 +351,7 @@ def get_system_metrics():
         'recording': recording_state,
         'battery': battery,
         'gps': gps,
-        'sync': sync,
+        #'sync': sync,
         'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     }
     
@@ -398,7 +398,7 @@ if __name__ == '__main__':
     print(f"Device Name: {DEVICE_NAME}")
     
     # Initialize mDNS service
-    print("\Starting mDNS service...")
+    print("\nStarting mDNS service...")
     mdns_service = EweGoMDNS(device_id=DEVICE_ID, port=5000)
     if mdns_service.start():
         print(f"Device discoverable at: http://{DEVICE_ID}.local:5000")
@@ -406,15 +406,15 @@ if __name__ == '__main__':
         print("mDNS failed - device only accessible by IP address")
     
     # Initialize GPS
-    print("\Initializing GPS...")
+    print("\nInitializing GPS...")
     if init_gps():
         print("GPS initialized (waiting for fix...)")
     else:
         print("GPS initialization failed")
     
-    # Create recordings directory
+    """# Create recordings directory
     os.makedirs('/home/pi/recordings', exist_ok=True)
-    print("\nRecordings directory ready")
+    print("\nRecordings directory ready")"""
     
     print("\nStarting Flask web server...")
     print(f"   Local: http://localhost:5000")

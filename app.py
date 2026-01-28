@@ -13,7 +13,7 @@ import adafruit_max1704x
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash
 from threading import Lock
 from datetime import datetime
-#from serial import Serial
+from serial import Serial
 from pyubx2 import UBXReader
 from zeroconf import  ServiceInfo, Zeroconf  #mDNS
 from mdns_setup import EweGoMDNS
