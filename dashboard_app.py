@@ -98,26 +98,38 @@ def get_devices():
         devices_list= []
         for device_id, device_info in discovered_devices.items():
             
-            health = device_health_data.get(device_id, {
-                'status': 'unknown',
-                'data': None,
-                'last_seen': 0
-            })
+            health = device_health_data.get(device_id, {})
+        
+            if health.get('data'):
+                return jsonify(health['data'])
+            else:
+                return jsonify({
+                    'error': 'Device offline',
+                    'device_id': device_id
+            }), 503
             
-            devices_list.append({
-                'device_id': device_id,
-                'device_name': device_info['device_name'],
-                'ip': device_info['ip'],
-                'url': device_info['url'],
-                'status': health['status'],
-                'health': health['data'],
-                'last_seen': health['last_seen']
-            })
-    
-    return jsonify({
-        'devices': devices_list,
-        'count': len(devices_list)
-    })
+            
+@app.route('/api/health')
+def get_health():
+    """
+    Returns health data for single-device dashboard
+    Gets the first discovered device's data
+    """
+    with discovery_lock:
+        if not discovered_devices:
+            return jsonify({'error': 'No devices found'}), 404
+        
+        # Get first device
+        device_id = list(discovered_devices.keys())[0]
+        health = device_health_data.get(device_id, {})
+        
+        if health.get('data'):
+            return jsonify(health['data'])
+        else:
+            return jsonify({
+                'error': 'Device offline',
+                'device_id': device_id
+            }), 503
     
 # Start the recording of the devices from dashboard
 @app.route('/api/device/<device_id>/toggle_recording', methods=['POST'])

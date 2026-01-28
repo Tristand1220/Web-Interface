@@ -434,7 +434,7 @@
         // Update health data from API
         async function updateHealth() {
             try {
-                const response = await fetch('/api/health');
+                const response = await fetch('/api/devices');
                 const data = await response.json();
 
                 //Update actual name of device
