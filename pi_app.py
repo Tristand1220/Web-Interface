@@ -40,7 +40,8 @@ gps_data = {
     'latitude': 0.0,
     'longitude': 0.0,
     'altitude': 0.0,
-    'available': False
+    'available': False,
+    'last_update': None
 }
 
 #GPS Globals
@@ -215,10 +216,19 @@ def process_gps_message(msg):
             
         # NMEA GGA (Global Positioning System Fix Data)
         elif 'GGA' in msg_id:
-            gps_data['latitude'] = getattr(msg, 'lat', 0.0)
-            gps_data['longitude'] = getattr(msg, 'lon', 0.0)
-            gps_data['altitude'] = getattr(msg, 'alt', 0.0)
-            gps_data['satellites'] = getattr(msg, 'numSV', 0)
+            try:
+                lat = getattr(msg, 'lat', 0.0)
+                lon = getattr(msg, 'lon', 0.0)
+                alt = getattr(msg, 'alt', 0.0)
+                
+                # Convert to float, handle empty strings
+                gps_data['latitude'] = float(lat) if lat != '' else 0.0
+                gps_data['longitude'] = float(lon) if lon != '' else 0.0
+                gps_data['altitude'] = float(alt) if alt != '' else 0.0
+                gps_data['satellites'] = int(getattr(msg, 'numSV', 0))
+            except (ValueError, TypeError) as e:
+                # Skip invalid data
+                pass
             
             # NMEA quality indicator
             quality = getattr(msg, 'quality', 0)
@@ -231,8 +241,15 @@ def process_gps_message(msg):
                 
         # NMEA RMC (Recommended Minimum)
         elif 'RMC' in msg_id:
-            gps_data['latitude'] = getattr(msg, 'lat', 0.0)
-            gps_data['longitude'] = getattr(msg, 'lon', 0.0)
+            try:
+                lat = getattr(msg, 'lat', 0.0)
+                lon = getattr(msg, 'lon', 0.0)
+                
+                # Convert to float, handle empty strings
+                gps_data['latitude'] = float(lat) if lat != '' else 0.0
+                gps_data['longitude'] = float(lon) if lon != '' else 0.0
+            except (ValueError, TypeError) as e:
+                pass
             #gps_data['speed'] = getattr(msg, 'spd', 0.0) * 0.514444  # knots to m/s
             #gps_data['heading'] = getattr(msg, 'cog', 0.0)
             
@@ -252,15 +269,15 @@ def get_gps_status():
             gps_data['fix'] = 'no fix'
         
             
-        return {
-            # Real data
-            'connected': gps_data['connected'],
-            'fix': gps_data['fix'],
-            'latitude': round(gps_data['latitude'], 6),
-            'longitude': round(gps_data['longitude'], 6),
-            'altitude': round(gps_data['altitude'], 2),
-            'available': gps_data['available']  
-        }
+    return {
+        # Real data
+        'connected': gps_data['connected'],
+        'fix': gps_data['fix'],
+        'latitude': round(gps_data['latitude'], 6),
+        'longitude': round(gps_data['longitude'], 6),
+        'altitude': round(gps_data['altitude'], 2),
+        'available': gps_data['available']  
+    }
 
 # ============================================================================
 # SYNC STATUS

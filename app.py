@@ -1,4 +1,4 @@
-# app.py
+"""# app.py
 import os
 import json
 import glob
@@ -419,4 +419,4 @@ if __name__ == '__main__':
         print("Stopping mDNS service...")
         if mdns_service:
             mdns_service.stop()
-        print("✅ Shutdown complete")
+        print("✅ Shutdown complete")"""
