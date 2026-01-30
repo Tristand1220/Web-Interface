@@ -361,6 +361,7 @@
                                 <div style="font-size: 0.9rem; margin-top: 0.5rem;">
                                     <div id="gpsLat">Lat: --</div>
                                     <div id="gpsLon">Lon: --</div>
+                                    <div id="gpsAlt">Alt: --</div>
                                 </div>
                             </div>
                         </div>
@@ -531,13 +532,16 @@
         function updateGPS(gps) {
             const latEl = document.getElementById('gpsLat');
             const lonEl = document.getElementById('gpsLon');
+            const altEl = document.getElementById('gpsAlt')
             
             if (gps.connected) {
                 latEl.textContent = `Lat: ${gps.latitude.toFixed(4)}°`;
                 lonEl.textContent = `Lon: ${gps.longitude.toFixed(4)}°`;
+                altEl.textContent = `Alt: ${gps.altitude.toFixed(1)}m`;
             } else {
                 latEl.textContent = 'Lat: --';
                 lonEl.textContent = 'Lon: --';
+                altEl.textContent = 'Alt: --';
             }
         }
 
