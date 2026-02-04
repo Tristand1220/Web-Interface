@@ -488,7 +488,7 @@ def get_system_metrics():
 
 @app.route('/')
 def dashboard():  
-    return render_template('dashboard.html')
+    """return render_template('dashboard.html')"""
 
     """ Uncomment this for Simple status page for testing changes """
     return f"""
@@ -549,28 +549,6 @@ def start_recording_api():
         'message': message
     })
     
-@app.route('/api/recording/stop', methods=['POST'])
-def stop_recording_api():
-    
-    #Stop recording process from API
-    success, message = stop_recording()
-    return jsonify({
-        'recording': recording_state,
-        'success': success,
-        'message': message
-    })
-
-@app.route('/api/recording/start', methods=['POST'])
-def start_recording_api():
-    
-    #Start recording process from API
-    success, message = start_recording()
-    return jsonify({
-        'recording': recording_state,
-        'success': success,
-        'message': message
-    })
-
 @app.route('/api/recording/stop', methods=['POST'])
 def stop_recording_api():
     
