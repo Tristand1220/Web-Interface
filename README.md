@@ -3,7 +3,7 @@
 This application allows for raspberry pi devices connected to the same mdns server to have their system health displayed locally within an 
 interative web dashboard hosted via Python FLASK
 
-![Dashboard](templates/EweGoUIWithData (1).png)
+![Dashboard](templates/EweGoUIWithData(1).png)
 
 ## Features
 
