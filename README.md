@@ -3,6 +3,8 @@
 This application allows for raspberry pi devices connected to the same mdns server to have their system health displayed locally within an 
 interative web dashboard hosted via Python FLASK
 
+![Dashboard](assets/dashboard.png)
+
 ## Features
 
 - ✅ Allows for recording/syncing files while in runtime
