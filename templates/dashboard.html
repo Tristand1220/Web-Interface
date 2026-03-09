@@ -361,6 +361,7 @@
                                 <div style="font-size: 0.9rem; margin-top: 0.5rem;">
                                     <div id="gpsLat">Lat: --</div>
                                     <div id="gpsLon">Lon: --</div>
+                                    <div id="gpsAlt">Alt: --</div>
                                 </div>
                             </div>
                         </div>
@@ -434,9 +435,13 @@
         // Update health data from API
         async function updateHealth() {
             try {
-                const response = await fetch('/api/health');
+                const response = await fetch('/api/devices');
                 const data = await response.json();
-                
+
+                //Update actual name of device
+                document.getElementById('deviceName').innerHTML = 
+                    `<i class="bi bi-laptop"></i> ${data.device_name || data.device_id || 'Unknown device'}`;
+
                 // Update basic metrics
                 document.getElementById('latency').textContent = data.latency;
                 document.getElementById('uptime').textContent = data.uptime_hours;
@@ -527,13 +532,16 @@
         function updateGPS(gps) {
             const latEl = document.getElementById('gpsLat');
             const lonEl = document.getElementById('gpsLon');
+            const altEl = document.getElementById('gpsAlt')
             
             if (gps.connected) {
                 latEl.textContent = `Lat: ${gps.latitude.toFixed(4)}°`;
                 lonEl.textContent = `Lon: ${gps.longitude.toFixed(4)}°`;
+                altEl.textContent = `Alt: ${gps.altitude.toFixed(1)}m`;
             } else {
                 latEl.textContent = 'Lat: --';
                 lonEl.textContent = 'Lon: --';
+                altEl.textContent = 'Alt: --';
             }
         }
 

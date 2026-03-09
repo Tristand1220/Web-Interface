@@ -7,14 +7,17 @@ import psutil
 import subprocess
 import threading
 import socket
+import signal
 import board
 import adafruit_max1704x
 
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash
 from datetime import datetime
-from serial import Serial
-from pyubx2 import UBXReader
-from mdns_setup import EweGoMDNS
+import serial
+from pyubx2 import UBXReader # For GPS parsing
+from mdns_setup import EweGoMDNS #For mDNS service
+from pathlib import Path
+
 
 app = Flask(__name__)
 
@@ -23,7 +26,16 @@ app = Flask(__name__)
 DEVICE_ID = os.environ.get('DEVICE_ID', socket.gethostname())
 DEVICE_NAME = os.environ.get('DEVICE_NAME', f'RaspberryPi - {DEVICE_ID}')
 
-#Service
+# Dual-camera script
+CAMERA_SCRIPT = Path(__file__).parent/ "daul_cam_jp2_hw.py"
+
+# Recording states
+recording_state = False
+recording_process = False
+recording_lock = threading.Lock()
+
+
+# mDNS Service
 mdns_setup = None
 
 # Global states
@@ -40,7 +52,8 @@ gps_data = {
     'latitude': 0.0,
     'longitude': 0.0,
     'altitude': 0.0,
-    'available': False
+    'available': False,
+    'last_update': None
 }
 
 #GPS Globals
@@ -133,7 +146,7 @@ def init_gps(port='/dev/ttyACM0', baudrate=38400):
     global gps_serial,gps_reader, gps_thread, gps_running
     try:
         # Opening the serial connection to GPS
-        gps_serial = Serial(port, baudrate, timeout=1)
+        gps_serial = serial.Serial(port, baudrate, timeout=1)
         
         # UBX Reader, handles UBX and NMEA messages
         gps_reader =UBXReader(gps_serial, protfilter=7)
@@ -215,10 +228,19 @@ def process_gps_message(msg):
             
         # NMEA GGA (Global Positioning System Fix Data)
         elif 'GGA' in msg_id:
-            gps_data['latitude'] = getattr(msg, 'lat', 0.0)
-            gps_data['longitude'] = getattr(msg, 'lon', 0.0)
-            gps_data['altitude'] = getattr(msg, 'alt', 0.0)
-            gps_data['satellites'] = getattr(msg, 'numSV', 0)
+            try:
+                lat = getattr(msg, 'lat', 0.0)
+                lon = getattr(msg, 'lon', 0.0)
+                alt = getattr(msg, 'alt', 0.0)
+                
+                # Convert to float, handle empty strings
+                gps_data['latitude'] = float(lat) if lat != '' else 0.0
+                gps_data['longitude'] = float(lon) if lon != '' else 0.0
+                gps_data['altitude'] = float(alt) if alt != '' else 0.0
+                gps_data['satellites'] = int(getattr(msg, 'numSV', 0))
+            except (ValueError, TypeError) as e:
+                # Skip invalid data
+                pass
             
             # NMEA quality indicator
             quality = getattr(msg, 'quality', 0)
@@ -231,8 +253,15 @@ def process_gps_message(msg):
                 
         # NMEA RMC (Recommended Minimum)
         elif 'RMC' in msg_id:
-            gps_data['latitude'] = getattr(msg, 'lat', 0.0)
-            gps_data['longitude'] = getattr(msg, 'lon', 0.0)
+            try:
+                lat = getattr(msg, 'lat', 0.0)
+                lon = getattr(msg, 'lon', 0.0)
+                
+                # Convert to float, handle empty strings
+                gps_data['latitude'] = float(lat) if lat != '' else 0.0
+                gps_data['longitude'] = float(lon) if lon != '' else 0.0
+            except (ValueError, TypeError) as e:
+                pass
             #gps_data['speed'] = getattr(msg, 'spd', 0.0) * 0.514444  # knots to m/s
             #gps_data['heading'] = getattr(msg, 'cog', 0.0)
             
@@ -252,21 +281,21 @@ def get_gps_status():
             gps_data['fix'] = 'no fix'
         
             
-        return {
-            # Real data
-            'connected': gps_data['connected'],
-            'fix': gps_data['fix'],
-            'latitude': round(gps_data['latitude'], 6),
-            'longitude': round(gps_data['longitude'], 6),
-            'altitude': round(gps_data['altitude'], 2),
-            'available': gps_data['available']  
-        }
+    return {
+        # Real data
+        'connected': gps_data['connected'],
+        'fix': gps_data['fix'],
+        'latitude': round(gps_data['latitude'], 6),
+        'longitude': round(gps_data['longitude'], 6),
+        'altitude': round(gps_data['altitude'], 2),
+        'available': gps_data['available']  
+    }
 
 # ============================================================================
 # SYNC STATUS
 # ============================================================================
 
-def check_sync_status():
+"""def check_sync_status():
     #Check sync status from remote server
     global sync_state
     
@@ -305,7 +334,105 @@ def check_sync_status():
         print(f"Sync check error: {e}")
         sync_state['status'] = 'error'
         
-    return sync_state
+    return sync_state"""
+    
+# ============================================================================
+# RECORDING MANAGEMENT
+# ============================================================================
+
+def start_recording():
+    # Start dual camers recording script/ retruns success boolean & message
+    global recording_state,recording_process
+    
+    with recording_lock:
+        if recording_state:
+            return False, "Recording  already in progress"
+        
+        if not CAMERA_SCRIPT.exists():
+            return False, f"Camera script not found: {CAMERA_SCRIPT}"
+        
+        try:
+            # Satrt recording script as a subprocess
+            recording_process = subprocess.Popen(['python3', str(CAMERA_SCRIPT)],
+                                                 stdout=subprocess.PIPE,
+                                                 stderr=subprocess.PIPE,
+                                                 stdin=subprocess.PIPE,
+                                                 preexec_fn=os.setsid) # Creates new process group for termination
+            
+            # Give 1 second buffer to start
+            time.sleep(1)
+            
+            # Check if process has started correctly
+            if recording_process.poll() is not None:
+                # Terminate process; something went wrong
+                stdout, stderr = recording_process.communicate()
+                error_msg = stderr.decode('utf-8') if stderr else "Unknown error"
+                return False, f"Recording script failed to start: {error_msg}"
+
+            recording_state = True
+            print(f" Camera recording started under PID: {recording_process.pid}")
+            return True, "Recording started succesfully"
+        
+        except Exception as e:
+            return False, f"Recording failed: {str(e)}"
+        
+def stop_recording():
+    # Stop dual camera recording script/ returns success boolean & message
+    global recording_state,recording_process
+    
+    with recording_lock:
+        if not recording_state:
+            return False, "No recording in progress"
+        
+        if recording_process is None:
+            recording_process = False
+            return False, "Recording process not found"
+        
+        try:
+            # Send SIGTERM for graceful shutdown
+            print(f" Stopping recording process under PID: {recording_process.pid}")
+            os.killpg(os.getpgid(recording_process.pid), signal.SIGTERM)
+            
+            # Waiting for proceess to terminate in 10 seconds
+            try:
+                recording_process.wait(timeout=10)
+                print( "Recording stopped")
+            except subprocess.TimeoutExpired:
+                 # Forcing stop
+                 print("Forcing recording process to stop")
+                 os.killpg(os.getpgid(recording_process.pid), signal.SIGKILL)
+                 recording_process.wait()
+                 print("Recording force stopped")
+        
+        
+            recording_state = False
+            recording_process =  None
+            return True, "Recording stopped"
+                
+        except Exception as e:
+            recording_state =False
+            recording_process = None
+            return False, f"Error stopping recording: {str(e)}"
+        
+def is_recording():
+    # Check if recording is active
+    global recording_state,recording_process
+    
+    if not recording_state:
+        return False
+    
+    if recording_process is None:
+        recording_state = False
+        return False
+    
+    # Check if process is still running
+    if recording_process.poll() is not None:
+        # Process has been terminated
+        recording_state = False
+        recording_process = None
+        return False
+    
+    return True
             
 # ============================================================================
 # SYSTEM METRICS
@@ -338,10 +465,10 @@ def get_system_metrics():
     # Other monitored data
     battery = get_battery_level()
     gps = get_gps_status()
-    sync = check_sync_status()
+    """sync = check_sync_status()"""
     
     return {
-        'device_name': 'RPi CM4 - Sensor System',
+        'device_name': DEVICE_ID,
         'memory_used': round(memory_used_gb, 2),
         'memory_total': round(memory_total_gb, 2),
         'memory_percent': round(memory_percent, 1),
@@ -351,7 +478,7 @@ def get_system_metrics():
         'recording': recording_state,
         'battery': battery,
         'gps': gps,
-        'sync': sync,
+        #'sync': sync,
         'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     }
     
@@ -361,7 +488,20 @@ def get_system_metrics():
 
 @app.route('/')
 def dashboard():  
-    return render_template('dashboard.html')
+    """return render_template('dashboard.html')"""
+
+    """ Uncomment this for Simple status page for testing changes """
+    return f"""
+    <html>
+    <head><title>{DEVICE_NAME}</title></head>
+    <body>
+        <h1>{DEVICE_NAME}</h1>
+        <p>Device ID: {DEVICE_ID}</p>
+        <p>Status: Online</p>
+        <p>API: <a href="/api/health">/api/health</a></p>
+    </body>
+    </html>
+    """
 
 # Collect system metrics (health) data as a JSON from API
 @app.route('/api/health')
@@ -376,15 +516,59 @@ def health():
 # Start the recording of the devices from dashboard
 @app.route('/api/toggle_recording', methods=['POST'])
 def toggle_recording():
+    
+    # Recording on/off toggle
     global recording_state
-    recording_state = not recording_state
     
-    # Call the dual_camera script from here
+    if recording_state or is_recording():
+        # Stop recording
+        success, message = stop_recording()
+        return jsonify({
+            'recording': recording_state,
+            'success': success,
+            'message': message
+        })
+        
+    else:
+        # Start recording
+        success, message = start_recording()
+        return jsonify({
+            'recording': recording_state,
+            'success': success,
+            'message': message
+        })
+            
+@app.route('/api/recording/start', methods=['POST'])
+def start_recording_api():
     
+    #Start recording process from API
+    success, message = start_recording()
     return jsonify({
         'recording': recording_state,
-        'message': 'Recording started' if recording_state else 'Recording stopped'
+        'success': success,
+        'message': message
     })
+    
+@app.route('/api/recording/stop', methods=['POST'])
+def stop_recording_api():
+    
+    #Stop recording process from API
+    success, message = stop_recording()
+    return jsonify({
+        'recording': recording_state,
+        'success': success,
+        'message': message
+    })
+    
+@app.route('/api/recording/status')
+def recording_status_api():
+    
+    # Get current recording status
+    return jsonify({
+        'recording': is_recording(),
+        'process_id': recording_process.pid if recording_process else None
+    })
+
 
 """# Triggering a sync from dashboard (need to complete)
 @app.route('/api/sync', methods=['POST'])
@@ -398,7 +582,7 @@ if __name__ == '__main__':
     print(f"Device Name: {DEVICE_NAME}")
     
     # Initialize mDNS service
-    print("\Starting mDNS service...")
+    print("\nStarting mDNS service...")
     mdns_service = EweGoMDNS(device_id=DEVICE_ID, port=5000)
     if mdns_service.start():
         print(f"Device discoverable at: http://{DEVICE_ID}.local:5000")
@@ -406,15 +590,15 @@ if __name__ == '__main__':
         print("mDNS failed - device only accessible by IP address")
     
     # Initialize GPS
-    print("\Initializing GPS...")
+    print("\nInitializing GPS...")
     if init_gps():
         print("GPS initialized (waiting for fix...)")
     else:
         print("GPS initialization failed")
     
-    # Create recordings directory
+    """# Create recordings directory
     os.makedirs('/home/pi/recordings', exist_ok=True)
-    print("\nRecordings directory ready")
+    print("\nRecordings directory ready")"""
     
     print("\nStarting Flask web server...")
     print(f"   Local: http://localhost:5000")

@@ -1,4 +1,4 @@
-# app.py
+"""# app.py
 import os
 import json
 import glob
@@ -13,7 +13,7 @@ import adafruit_max1704x
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash
 from threading import Lock
 from datetime import datetime
-#from serial import Serial
+from serial import Serial
 from pyubx2 import UBXReader
 from zeroconf import  ServiceInfo, Zeroconf  #mDNS
 from mdns_setup import EweGoMDNS
@@ -419,4 +419,4 @@ if __name__ == '__main__':
         print("Stopping mDNS service...")
         if mdns_service:
             mdns_service.stop()
-        print("✅ Shutdown complete")
+        print("✅ Shutdown complete")"""
